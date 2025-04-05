@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import authorizedUsers from "./authorizedUsers"; // Import the users JSON
 import "./signup.css";
+import { toast } from 'react-toastify';
+
+const API_URL = 'http://localhost:5000/api';
 
 export default function Signup() {
   const [username, setUsername] = useState("");
@@ -29,39 +31,90 @@ export default function Signup() {
       .then((user) => {
         console.log("User Info:", user);
         
-        // Check if the user is already registered
-        if (authorizedUsers.some((u) => u.email === user.email)) {
-          alert("User already exists! Please log in.");
-          return;
-        }
-
-        // Add new user to JSON
-        authorizedUsers.push({ username: user.name, email: user.email, password: "google-auth" });
-        console.log(authorizedUsers);
-        alert("Signup successful using Google!");
+        fetch(`${API_URL}/signup/google`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: user.name, email: user.email }),
+        })
+        .then(res => {
+          if (!res.ok) {
+            return res.json().then(data => Promise.reject(data));
+          }
+          return res.json();
+        })
+        .then(data => {
+          toast.success(data.message);
+        })
+        .catch(err => {
+          toast.error(err.message || "Failed to register with Google");
+          console.error("Failed to register user", err);
+        });
       })
-      .catch((err) => console.error("Failed to verify token", err));
+      .catch((err) => {
+        toast.error("Failed to verify Google token");
+        console.error("Failed to verify token", err);
+      });
   }
 
-  function handleSignup(event) {
-    event.preventDefault(); // Prevents form reload
+  // Add validation function
+  const validateInputs = () => {
+    // Email validation using regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Please enter a valid email address");
+      return false;
+    }
 
-    console.log("Signup clicked");
-    console.log("Entered Email:", email);
+    // Username validation (at least 3 characters, no special characters)
+    if (username.length < 3 || /[^a-zA-Z0-9 ]/.test(username)) {
+      toast.error("Username must be at least 3 characters long and contain only letters, numbers and spaces");
+      return false;
+    }
+
+    // Password validation (at least 6 characters)
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return false;
+    }
+
+    return true;
+  };
+
+  function handleSignup(event) {
+    event.preventDefault();
 
     if (!email || !username || !password) {
-      alert("Enter your Credentials");
+      toast.warning("Please enter all credentials");
       return;
     }
 
-    if (authorizedUsers.some((user) => user.email === email)) {
-      alert("User already exists! Please log in.");
+    // Add validation check
+    if (!validateInputs()) {
       return;
     }
 
-    authorizedUsers.push({ username, email, password });
-    console.log("Updated authorizedUsers:", authorizedUsers);
-    alert("Signup successful! You can now log in.");
+    fetch(`${API_URL}/signup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, email, password }),
+    })
+    .then(res => {
+      if (!res.ok) {
+        return res.json().then(data => Promise.reject(data));
+      }
+      return res.json();
+    })
+    .then(data => {
+      toast.success(data.message);
+    })
+    .catch(err => {
+      toast.error(err.message || "Failed to register");
+      console.error("Failed to register user", err);
+    });
   }
 
 
@@ -72,21 +125,17 @@ export default function Signup() {
       <div className="block">
         <div className="input_info">
           <label>Username</label>
-      
           <input
-            required
             type="text"
-            placeholder="Your Name"
+            placeholder="Your Name (min. 3 characters)"
             onChange={(e) => setUsername(e.target.value)}
           />
         </div>
 
         <div className="input_info">
           <label>Email ID</label>
-         
           <input
-            required
-            type="email"
+            type="text"
             placeholder="Your email address"
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -94,11 +143,9 @@ export default function Signup() {
 
         <div className="input_info">
           <label>Password</label>
-
           <input
-          required
             type="password"
-            placeholder="Create a password"
+            placeholder="Create a password (min. 6 characters)"
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
